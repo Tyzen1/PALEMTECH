@@ -1,0 +1,100 @@
+{
+  "entities": {
+    "IncidentReport": {
+      "title": "IncidentReport",
+      "description": "Laporan insiden, titik macet, banjir, kriminalitas, kebakaran, atau kegiatan di Kota Palembang",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string", "maxLength": 200, "description": "Judul laporan kejadian" },
+        "category": { "type": "string", "enum": ["begal", "kecelakaan", "macet", "banjir", "demo", "kebakaran", "event", "lainnya"], "description": "Kategori insiden atau event" },
+        "severity": { "type": "string", "enum": ["low", "medium", "high", "critical"], "description": "Tingkat keparahan kejadian" },
+        "description": { "type": "string", "maxLength": 2000, "description": "Kronologi atau detail laporan" },
+        "address": { "type": "string", "maxLength": 300, "description": "Nama lokasi atau patokan di Palembang" },
+        "latitude": { "type": "number", "description": "Koordinat lintang lokasi kejadian" },
+        "longitude": { "type": "number", "description": "Koordinat bujur lokasi kejadian" },
+        "imageUrl": { "type": "string", "maxLength": 1000, "description": "URL foto bukti atau kejadian" },
+        "reporterName": { "type": "string", "maxLength": 100, "description": "Nama pelapor" },
+        "reporterUid": { "type": "string", "maxLength": 128, "description": "UID pelapor" },
+        "reporterEmail": { "type": "string", "maxLength": 200, "description": "Email pelapor" },
+        "agency": { "type": "string", "enum": ["DAMKAR", "POLRESTABES", "BMKG", "DISHUB", "SAR", "UMUM"], "description": "Instansi yang berwenang merespon" },
+        "status": { "type": "string", "enum": ["pending", "verified", "rejected", "resolved"], "description": "Status kurasi atau penanganan laporan" },
+        "upvotes": { "type": "number", "description": "Jumlah konfirmasi/upvote warga" },
+        "isOfficial": { "type": "boolean", "description": "Apakah dibuat resmi oleh admin/instansi" },
+        "curatorNotes": { "type": "string", "maxLength": 500, "description": "Catatan kurasi admin" },
+        "createdAt": { "type": "string", "description": "Waktu pembuatan laporan" },
+        "updatedAt": { "type": "string", "description": "Waktu pembaruan laporan" }
+      },
+      "required": ["title", "category", "description", "address", "latitude", "longitude", "reporterUid", "status", "createdAt"]
+    },
+    "CityNews": {
+      "title": "CityNews",
+      "description": "Berita resmi, pengumuman event, dan rilis pers instansi Kota Palembang",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string", "maxLength": 250, "description": "Judul berita atau event" },
+        "summary": { "type": "string", "maxLength": 500, "description": "Ringkasan berita" },
+        "content": { "type": "string", "maxLength": 5000, "description": "Isi lengkap berita" },
+        "category": { "type": "string", "enum": ["event", "darurat", "lalulintas", "lingkungan", "himbauan"], "description": "Kategori berita" },
+        "imageUrl": { "type": "string", "maxLength": 1000, "description": "Gambar sampul berita" },
+        "authorName": { "type": "string", "maxLength": 100, "description": "Nama penulis/admin" },
+        "authorUid": { "type": "string", "maxLength": 128, "description": "UID admin" },
+        "locationName": { "type": "string", "maxLength": 200, "description": "Lokasi terkait di Palembang" },
+        "latitude": { "type": "number", "description": "Koordinat lintang" },
+        "longitude": { "type": "number", "description": "Koordinat bujur" },
+        "agency": { "type": "string", "maxLength": 100, "description": "Instansi sumber" },
+        "createdAt": { "type": "string", "description": "Waktu terbit" }
+      },
+      "required": ["title", "summary", "content", "category", "authorUid", "createdAt"]
+    },
+    "AirQualityStation": {
+      "title": "AirQualityStation",
+      "description": "Indeks standar pencemar udara (ISPU/AQI) dan cuaca BMKG di Palembang",
+      "type": "object",
+      "properties": {
+        "stationName": { "type": "string", "maxLength": 100, "description": "Nama stasiun pemantau" },
+        "district": { "type": "string", "maxLength": 100, "description": "Kecamatan di Palembang" },
+        "aqi": { "type": "number", "description": "Indeks AQI / ISPU" },
+        "pm25": { "type": "number", "description": "Kadar partikulat PM2.5 ug/m3" },
+        "status": { "type": "string", "enum": ["BAIK", "SEDANG", "TIDAK_SEHAT", "SANGAT_TIDAK_SEHAT", "BERBAHAYA"], "description": "Kategori mutu udara" },
+        "temperature": { "type": "number", "description": "Suhu derajat celcius" },
+        "weather": { "type": "string", "maxLength": 50, "description": "Kondisi cuaca BMKG" },
+        "humidity": { "type": "number", "description": "Kelembapan udara persen" },
+        "latitude": { "type": "number", "description": "Latitude stasiun" },
+        "longitude": { "type": "number", "description": "Longitude stasiun" },
+        "updatedAt": { "type": "string", "description": "Waktu pembaruan data" }
+      },
+      "required": ["stationName", "district", "aqi", "status", "latitude", "longitude"]
+    },
+    "ReportComment": {
+      "title": "ReportComment",
+      "description": "Komentar atau update saksi mata pada laporan kejadian",
+      "type": "object",
+      "properties": {
+        "reportId": { "type": "string", "maxLength": 128, "description": "ID laporan yang dikomentari" },
+        "authorUid": { "type": "string", "maxLength": 128, "description": "UID komentator" },
+        "authorName": { "type": "string", "maxLength": 100, "description": "Nama komentator" },
+        "comment": { "type": "string", "maxLength": 1000, "description": "Isi komentar atau kesaksian warga" },
+        "createdAt": { "type": "string", "description": "Waktu komentar" }
+      },
+      "required": ["reportId", "authorUid", "authorName", "comment", "createdAt"]
+    }
+  },
+  "firestore": {
+    "/incidents/{incidentId}": {
+      "schema": { "$ref": "#/entities/IncidentReport" },
+      "description": "Kumpulan laporan kejadian publik dan titik pantau Kota Palembang"
+    },
+    "/news/{newsId}": {
+      "schema": { "$ref": "#/entities/CityNews" },
+      "description": "Kumpulan berita resmi dan event kota Palembang"
+    },
+    "/air_quality/{stationId}": {
+      "schema": { "$ref": "#/entities/AirQualityStation" },
+      "description": "Data pemantauan kualitas udara dan asap BMKG Palembang"
+    },
+    "/comments/{commentId}": {
+      "schema": { "$ref": "#/entities/ReportComment" },
+      "description": "Komentar dan kesaksian warga pada insiden"
+    }
+  }
+}

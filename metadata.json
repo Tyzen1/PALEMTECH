@@ -1,0 +1,6 @@
+{
+  "name": "Peta Palembang Siaga - Portal Pantau Kejadian, Event & Polusi Kota",
+  "description": "Portal peta interaktif Kota Palembang: pantau titik begal/kriminal, kecelakaan, macet, banjir, kebakaran, info event kota, laporan warga terkurasi, dan indeks polusi udara (ISPU/AQI).",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
