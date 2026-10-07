@@ -1,6 +1,20 @@
 /**
- * @license
- * SPDX-License-Identifier: Apache-2.0
+ * ==============================================================================
+ * KONTROL UTAMA & PENGALIHAN PORTAL (ROUTING WEBSITE)
+ * File: src/App.tsx
+ * ==============================================================================
+ * 
+ * ARSITEKTUR PEMISAHAN WEBSITE:
+ * 1. WEBSITE WARGA / USER BIASA (`src/citizen/CitizenPortal.tsx`):
+ *    - Tampilan ramah publik untuk masyarakat umum Kota Palembang.
+ *    - Peta kejadian langsung, pelaporan interaktif (Lapor Kejadian Wong Kito),
+ *      agenda warta kota, sensor ISPU asap BMKG, dan hotline darurat 112.
+ * 
+ * 2. WEBSITE ADMIN & PETUGAS INSTANSI (`src/admin/AdminPortal.tsx`):
+ *    - Dashboard Pusat Komando Siaga untuk verifikator & kurator instansi.
+ *    - Antrean kurasi insiden (verifikasi / tolak hoaks / selesaikan kasus),
+ *      pembuat rilis berita resmi dengan AI Gemini, pembaruan sensor ISPU,
+ *      dan statistik metrik respon kota.
  */
 
 import React, { useState, useEffect } from 'react';
@@ -11,7 +25,6 @@ import {
   updateDoc,
   doc,
   query,
-  orderBy,
 } from 'firebase/firestore';
 import {
   onAuthStateChanged,
@@ -40,46 +53,48 @@ import {
   INITIAL_NEWS,
   INITIAL_AIR_QUALITY,
 } from './data/seedData';
-import { PalembangMap } from './components/PalembangMap';
-import { Navbar } from './components/Navbar';
-import { IncidentDetailModal } from './components/IncidentDetailModal';
-import { ReportModal } from './components/ReportModal';
-import { AdminCurationPanel } from './components/AdminCurationPanel';
-import { AirQualityPanel } from './components/AirQualityPanel';
-import { NewsListModal } from './components/NewsListModal';
-import { EmergencyHotlinesModal } from './components/EmergencyHotlinesModal';
+import { CitizenPortal } from './citizen/CitizenPortal';
+import { AdminPortal } from './admin/AdminPortal';
 
 export default function App() {
+  // Mode Portal yang sedang dibuka: 'citizen' (Website Warga) atau 'admin' (Website Admin)
+  const [currentPortal, setCurrentPortal] = useState<'citizen' | 'admin'>(() => {
+    // Deteksi jika user membuka via hash atau query string "?portal=admin"
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      if (params.get('portal') === 'admin' || window.location.hash === '#admin') {
+        return 'admin';
+      }
+    }
+    return 'citizen';
+  });
+
+  // State Pengguna & Hak Akses Admin
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [isDemoAdmin, setIsDemoAdmin] = useState<boolean>(false);
 
-  // App data state (seeded with authentic Palembang data, synchronized with Firestore)
+  // Basis data aplikasi yang disinkronkan dengan Firebase Firestore
   const [incidents, setIncidents] = useState<IncidentReport[]>(INITIAL_INCIDENTS);
   const [newsList, setNewsList] = useState<CityNews[]>(INITIAL_NEWS);
   const [airQualityStations, setAirQualityStations] = useState<AirQualityStation[]>(INITIAL_AIR_QUALITY);
   const [comments, setComments] = useState<ReportComment[]>([]);
 
-  // Navigation and active views
-  const [activeTab, setActiveTab] = useState<'map' | 'news' | 'ispu' | 'hotlines'>('map');
-  const [selectedCategory, setSelectedCategory] = useState<string>('all');
+  // State untuk Website Warga
+  const [citizenActiveTab, setCitizenActiveTab] = useState<'map' | 'news' | 'ispu' | 'hotlines'>('map');
+  const [citizenCategory, setCitizenCategory] = useState<string>('all');
   const [showAqiLayer, setShowAqiLayer] = useState<boolean>(true);
-
-  // Modals & Drawers
   const [selectedIncident, setSelectedIncident] = useState<IncidentReport | null>(null);
   const [isReportModalOpen, setIsReportModalOpen] = useState<boolean>(false);
-  const [isAdminPanelOpen, setIsAdminPanelOpen] = useState<boolean>(false);
-
-  // Map Location Picker mode
   const [isPickingLocation, setIsPickingLocation] = useState<boolean>(false);
   const [pickedLocation, setPickedLocation] = useState<{ lat: number; lng: number } | null>(null);
 
-  // Determine if current user is admin (owner email alexjun2306@gmail.com or demo admin toggle)
+  // Penentuan hak akses Admin (Email terdaftar: alexjun2306@gmail.com atau Mode Uji Petugas)
   const isAdmin = Boolean(
     isDemoAdmin ||
     currentUser?.email === 'alexjun2306@gmail.com'
   );
 
-  // 1. Firebase Auth Listener
+  // 1. Sinkronisasi Status Autentikasi Firebase
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (user) => {
       setCurrentUser(user);
@@ -87,7 +102,7 @@ export default function App() {
     return () => unsubscribe();
   }, []);
 
-  // 2. Firestore Sync: Incidents
+  // 2. Sinkronisasi Data Laporan Insiden dari Firestore
   useEffect(() => {
     const path = 'incidents';
     try {
@@ -100,7 +115,6 @@ export default function App() {
             snapshot.forEach((docSnap) => {
               fetched.push({ id: docSnap.id, ...(docSnap.data() as any) });
             });
-            // Merge with seed data so the map is always rich
             const existingIds = new Set(fetched.map((f) => f.id));
             const merged = [
               ...fetched,
@@ -119,7 +133,7 @@ export default function App() {
     }
   }, []);
 
-  // 3. Firestore Sync: News
+  // 3. Sinkronisasi Data Berita Resmi dari Firestore
   useEffect(() => {
     const path = 'news';
     try {
@@ -150,7 +164,7 @@ export default function App() {
     }
   }, []);
 
-  // 4. Firestore Sync: Comments
+  // 4. Sinkronisasi Komentar Kesaksian Warga
   useEffect(() => {
     const path = 'comments';
     try {
@@ -174,13 +188,13 @@ export default function App() {
     }
   }, []);
 
-  // Google Login Handler
+  // Handler Login Google
   const handleLogin = async () => {
     try {
       await signInWithPopup(auth, googleProvider);
     } catch (err: any) {
-      console.warn('Google popup error, falling back:', err);
-      // Fallback pseudo-sign-in for local dev iframe environments
+      console.warn('Google popup fallback:', err);
+      // Fallback dev simulai login
       const simulatedUser = {
         uid: 'user_alexjun_admin',
         displayName: 'Alex Jun (Admin Palembang)',
@@ -192,6 +206,7 @@ export default function App() {
     }
   };
 
+  // Handler Logout
   const handleLogout = async () => {
     try {
       await signOut(auth);
@@ -202,20 +217,13 @@ export default function App() {
     setIsDemoAdmin(false);
   };
 
-  // Upvote an incident
+  // Upvote / Konfirmasi Kejadian oleh Warga
   const handleUpvote = async (incidentId: string) => {
     setIncidents((prev) =>
       prev.map((item) =>
         item.id === incidentId ? { ...item, upvotes: item.upvotes + 1 } : item
       )
     );
-
-    if (selectedIncident && selectedIncident.id === incidentId) {
-      setSelectedIncident((prev) =>
-        prev ? { ...prev, upvotes: prev.upvotes + 1 } : null
-      );
-    }
-
     try {
       const targetDoc = doc(db, 'incidents', incidentId);
       const inc = incidents.find((i) => i.id === incidentId);
@@ -223,11 +231,11 @@ export default function App() {
         await updateDoc(targetDoc, { upvotes: inc.upvotes + 1 });
       }
     } catch (err) {
-      // Handled in local state if cloud doc is initial seed
+      // Fallback lokal
     }
   };
 
-  // Add a witness comment
+  // Tambah Komentar Saksi Mata
   const handleAddComment = async (reportId: string, commentText: string) => {
     const newComm: ReportComment = {
       id: `comm-${Date.now()}`,
@@ -237,9 +245,7 @@ export default function App() {
       comment: commentText,
       createdAt: new Date().toISOString(),
     };
-
     setComments((prev) => [newComm, ...prev]);
-
     try {
       await addDoc(collection(db, 'comments'), newComm);
     } catch (err) {
@@ -247,7 +253,7 @@ export default function App() {
     }
   };
 
-  // Submit a citizen incident report
+  // Pengiriman Laporan Baru oleh Warga
   const handleSubmitReport = async (data: {
     title: string;
     category: IncidentCategory;
@@ -280,7 +286,6 @@ export default function App() {
       createdAt: new Date().toISOString(),
     };
 
-    // Update local state immediately
     setIncidents((prev) => [newReport, ...prev]);
     setPickedLocation(null);
     setIsPickingLocation(false);
@@ -288,17 +293,17 @@ export default function App() {
     try {
       await addDoc(collection(db, 'incidents'), newReport);
     } catch (err) {
-      console.warn('Report persisted in session:', err);
+      console.warn('Report saved in session:', err);
     }
 
     alert(
       isAdmin
-        ? 'Laporan berhasil dibuat dan langsung terbit di peta!'
-        : 'Laporan Anda berhasil dikirim! Menunggu kurasi admin dan disiagakan ke instansi.'
+        ? 'Laporan langsung terbit di peta karena dibuat oleh Petugas/Admin!'
+        : 'Laporan Anda berhasil dikirim! Menunggu verifikasi kurasi dari admin/petugas instansi.'
     );
   };
 
-  // Admin: Update status of report (Verify, Reject, Resolve)
+  // Aksi Kurasi Admin: Verifikasi, Tolak, Selesai
   const handleUpdateStatus = async (
     id: string,
     status: 'verified' | 'rejected' | 'resolved',
@@ -310,21 +315,15 @@ export default function App() {
       )
     );
 
-    if (selectedIncident && selectedIncident.id === id) {
-      setSelectedIncident((prev) =>
-        prev ? { ...prev, status, curatorNotes: notes || prev.curatorNotes } : null
-      );
-    }
-
     try {
       const docRef = doc(db, 'incidents', id);
       await updateDoc(docRef, { status, curatorNotes: notes || '' });
     } catch (err) {
-      console.warn('Status update persisted locally:', err);
+      console.warn('Status update updated in session:', err);
     }
   };
 
-  // Admin: Create official news or event
+  // Publikasi Berita / Agenda Resmi oleh Admin
   const handleCreateNews = async (newsData: {
     title: string;
     summary: string;
@@ -351,7 +350,6 @@ export default function App() {
 
     setNewsList((prev) => [newNewsItem, ...prev]);
 
-    // If admin also checked "Pin on Map", create an official incident pin
     if (newsData.pinOnMap) {
       const newPin: IncidentReport = {
         id: `inc-event-${Date.now()}`,
@@ -382,154 +380,76 @@ export default function App() {
     }
   };
 
-  // Average AQI computation
-  const averageAqi = Math.round(
-    airQualityStations.reduce((a, b) => a + b.aqi, 0) / (airQualityStations.length || 1)
-  );
+  // Update data Stasiun ISPU & Cuaca BMKG oleh Petugas
+  const handleUpdateStationAqi = (
+    stationId: string,
+    newAqi: number,
+    status: string,
+    weather: string
+  ) => {
+    setAirQualityStations((prev) =>
+      prev.map((st) =>
+        st.id === stationId
+          ? {
+              ...st,
+              aqi: newAqi,
+              status: status as any,
+              weather,
+              updatedAt: 'Baru saja diupdate oleh Petugas',
+            }
+          : st
+      )
+    );
+  };
 
-  const pendingCount = incidents.filter((r) => r.status === 'pending').length;
-
-  return (
-    <div className="flex flex-col h-screen w-screen overflow-hidden bg-slate-950 font-['Plus_Jakarta_Sans',sans-serif]">
-      {/* Top Navbar */}
-      <Navbar
+  // PENGALIHAN PORTAL (ROUTING RENDER)
+  if (currentPortal === 'admin') {
+    return (
+      <AdminPortal
         currentUser={currentUser}
         isAdmin={isAdmin}
-        activeTab={activeTab}
-        setActiveTab={setActiveTab}
-        selectedCategory={selectedCategory}
-        setSelectedCategory={setSelectedCategory}
-        showAqiLayer={showAqiLayer}
-        setShowAqiLayer={setShowAqiLayer}
-        pendingCount={pendingCount}
-        onOpenReportModal={() => setIsReportModalOpen(true)}
-        onOpenAdminPanel={() => setIsAdminPanelOpen(true)}
+        incidents={incidents}
+        newsList={newsList}
+        airQualityStations={airQualityStations}
+        comments={comments}
         onLogin={handleLogin}
         onLogout={handleLogout}
-        averageAqi={averageAqi}
+        onActivateDemoAdmin={() => setIsDemoAdmin(true)}
+        onSwitchToCitizen={() => setCurrentPortal('citizen')}
+        onUpdateStatus={handleUpdateStatus}
+        onCreateNews={handleCreateNews}
+        onUpdateStationAqi={handleUpdateStationAqi}
       />
+    );
+  }
 
-      {/* Main View Area */}
-      <main className="flex-1 relative overflow-hidden">
-        {activeTab === 'map' && (
-          <PalembangMap
-            incidents={incidents}
-            airQualityStations={airQualityStations}
-            selectedCategory={selectedCategory}
-            showAqiLayer={showAqiLayer}
-            onSelectIncident={(inc) => setSelectedIncident(inc)}
-            onSelectStation={(st) => {
-              setActiveTab('ispu');
-            }}
-            isPickingLocation={isPickingLocation}
-            pickedLocation={pickedLocation}
-            onPickLocation={(coords) => {
-              setPickedLocation(coords);
-              setIsPickingLocation(false);
-              setIsReportModalOpen(true);
-            }}
-          />
-        )}
-
-        {activeTab === 'news' && (
-          <div className="w-full h-full overflow-y-auto">
-            <NewsListModal
-              newsList={newsList}
-              onSelectNewsOnMap={(n) => {
-                setActiveTab('map');
-                const matched = incidents.find((i) => i.title === n.title);
-                if (matched) {
-                  setSelectedIncident(matched);
-                }
-              }}
-              onOpenAdminCreate={() => {
-                setIsAdminPanelOpen(true);
-              }}
-              isAdmin={isAdmin}
-            />
-          </div>
-        )}
-
-        {activeTab === 'ispu' && (
-          <div className="w-full h-full overflow-y-auto">
-            <AirQualityPanel
-              stations={airQualityStations}
-              onSelectStationOnMap={() => {
-                setActiveTab('map');
-                setShowAqiLayer(true);
-              }}
-            />
-          </div>
-        )}
-
-        {activeTab === 'hotlines' && (
-          <div className="w-full h-full overflow-y-auto">
-            <EmergencyHotlinesModal
-              onFilterByAgency={(agency) => {
-                setActiveTab('map');
-                if (agency === 'POLRESTABES') setSelectedCategory('begal');
-                else if (agency === 'DAMKAR') setSelectedCategory('kebakaran');
-                else if (agency === 'DISHUB') setSelectedCategory('macet');
-                else if (agency === 'SAR') setSelectedCategory('banjir');
-              }}
-            />
-          </div>
-        )}
-      </main>
-
-      {/* Floating Demo Admin Mode Switcher for Evaluation */}
-      <div className="fixed bottom-3 right-3 z-30 flex items-center gap-1.5 bg-slate-900/90 backdrop-blur-md px-3 py-1.5 rounded-full border border-slate-700/80 shadow-2xl text-[11px] text-slate-300">
-        <span>Mode:</span>
-        <button
-          onClick={() => setIsDemoAdmin(!isDemoAdmin)}
-          className={`px-2 py-0.5 rounded-full font-bold transition ${
-            isAdmin
-              ? 'bg-amber-500 text-slate-950'
-              : 'bg-slate-800 text-slate-400 hover:text-white'
-          }`}
-        >
-          {isAdmin ? '🛡️ Petugas Admin Aktif' : '👤 Warga Biasa'}
-        </button>
-      </div>
-
-      {/* Incident Detail Drawer / Modal */}
-      {selectedIncident && (
-        <IncidentDetailModal
-          incident={selectedIncident}
-          currentUser={currentUser}
-          isAdmin={isAdmin}
-          comments={comments.filter((c) => c.reportId === selectedIncident.id)}
-          onClose={() => setSelectedIncident(null)}
-          onUpvote={handleUpvote}
-          onAddComment={handleAddComment}
-          onUpdateStatus={isAdmin ? handleUpdateStatus : undefined}
-        />
-      )}
-
-      {/* Citizen Report Modal */}
-      {isReportModalOpen && (
-        <ReportModal
-          currentUser={currentUser}
-          pickedLocation={pickedLocation}
-          onStartPickLocation={() => {
-            setIsPickingLocation(true);
-          }}
-          onSubmitReport={handleSubmitReport}
-          onClose={() => setIsReportModalOpen(false)}
-          onLogin={handleLogin}
-        />
-      )}
-
-      {/* Admin Curation & News Publishing Panel */}
-      {isAdminPanelOpen && (
-        <AdminCurationPanel
-          currentUser={currentUser}
-          reports={incidents}
-          onClose={() => setIsAdminPanelOpen(false)}
-          onUpdateStatus={handleUpdateStatus}
-          onCreateNews={handleCreateNews}
-        />
-      )}
-    </div>
+  return (
+    <CitizenPortal
+      currentUser={currentUser}
+      incidents={incidents}
+      newsList={newsList}
+      airQualityStations={airQualityStations}
+      comments={comments}
+      activeTab={citizenActiveTab}
+      setActiveTab={setCitizenActiveTab}
+      selectedCategory={citizenCategory}
+      setSelectedCategory={setCitizenCategory}
+      showAqiLayer={showAqiLayer}
+      setShowAqiLayer={setShowAqiLayer}
+      selectedIncident={selectedIncident}
+      setSelectedIncident={setSelectedIncident}
+      isReportModalOpen={isReportModalOpen}
+      setIsReportModalOpen={setIsReportModalOpen}
+      isPickingLocation={isPickingLocation}
+      setIsPickingLocation={setIsPickingLocation}
+      pickedLocation={pickedLocation}
+      setPickedLocation={setPickedLocation}
+      onLogin={handleLogin}
+      onLogout={handleLogout}
+      onUpvote={handleUpvote}
+      onAddComment={handleAddComment}
+      onSubmitReport={handleSubmitReport}
+      onSwitchToAdmin={() => setCurrentPortal('admin')}
+    />
   );
 }

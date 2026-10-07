@@ -2,7 +2,7 @@ import tailwindcss from '@tailwindcss/vite';
 import react from '@vitejs/plugin-react';
 import path from 'path';
 import { defineConfig, Plugin } from 'vite';
-import { analyzeIncidentReport, generateCityNews } from './src/server/geminiApi';
+import { analyzeIncidentReport, generateCityNews } from './src/server/geminiApi.ts';
 
 function geminiApiPlugin(): Plugin {
   return {
@@ -54,7 +54,7 @@ export default defineConfig(() => {
     plugins: [react(), tailwindcss(), geminiApiPlugin()],
     resolve: {
       alias: {
-        '@': path.resolve(__dirname, '.'),
+        '@': path.resolve('.'),
       },
     },
     server: {
@@ -66,4 +66,5 @@ export default defineConfig(() => {
     },
   };
 });
+
 
